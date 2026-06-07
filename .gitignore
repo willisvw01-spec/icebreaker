@@ -1,0 +1,10 @@
+node_modules/
+*.log
+*.out
+boot.txt
+load.txt
+check.txt
+t.txt
+r.txt
+public/dev.html.bak
+nohup.out

@@ -1,0 +1,18 @@
+{
+  "name": "icebreaker",
+  "version": "1.0.0",
+  "description": "Live-lobby NHL roster draft — build a team, settle it on the ice.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-data.js && node test-bracket.js && node audit.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["nhl", "draft", "game", "multiplayer"],
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}

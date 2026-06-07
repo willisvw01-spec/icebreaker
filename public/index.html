@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ICEBREAKER — Build a roster. Settle it on the ice.</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap');
+
+  :root{
+    --bg:#070d16; --bg2:#0c1726; --panel:#101f33; --panel2:#16293f;
+    --ice:#36c6ff; --ice-dim:#1c89bd; --red:#ff3b47; --gold:#ffc24b;
+    --txt:#dce8f5; --mut:#7d93ab; --line:#22384f;
+    --accent:var(--ice);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Barlow',system-ui,sans-serif; color:var(--txt);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(54,198,255,.10), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(255,59,71,.07), transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.5;
+    background:
+      linear-gradient(90deg, transparent 49.6%, rgba(255,59,71,.05) 49.8%, rgba(255,59,71,.05) 50.2%, transparent 50.4%),
+      repeating-linear-gradient(0deg, transparent 0 38px, rgba(54,198,255,.018) 38px 39px);
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:18px 16px 64px; position:relative}
+
+  header{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 18px}
+  .logo{font-family:'Oswald'; font-weight:700; letter-spacing:.14em; font-size:20px}
+  .logo b{color:var(--ice)} .logo span{color:var(--red)}
+  .tag{font-family:'Barlow Condensed'; color:var(--mut); letter-spacing:.12em; text-transform:uppercase; font-size:12px}
+
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--bg2));
+    border:1px solid var(--line); border-radius:16px; padding:22px;
+    box-shadow:0 24px 60px -28px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03);
+  }
+  h1{font-family:'Oswald'; font-weight:700; font-size:clamp(34px,7vw,64px); line-height:.96; letter-spacing:-.01em}
+  h1 .a{color:var(--ice)} h1 .b{color:var(--red)}
+  .sub{color:var(--mut); margin-top:10px; font-size:16px; max-width:46ch}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  input{
+    font-family:'Barlow'; font-size:16px; color:#fff; background:#0a1726;
+    border:1px solid var(--line); border-radius:10px; padding:13px 14px; outline:none; transition:.15s;
+  }
+  input:focus{border-color:var(--ice); box-shadow:0 0 0 3px rgba(54,198,255,.18)}
+  input::placeholder{color:#56708a}
+  .code-in{width:130px; text-transform:uppercase; letter-spacing:.3em; font-family:'Oswald'; font-weight:600}
+
+  button{
+    font-family:'Oswald'; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    font-size:15px; color:#04121f; cursor:pointer; border:0; border-radius:10px;
+    padding:13px 20px; background:linear-gradient(180deg,#5fd6ff,var(--ice)); transition:.15s;
+    box-shadow:0 8px 22px -10px rgba(54,198,255,.7);
+  }
+  button:hover{transform:translateY(-1px); filter:brightness(1.07)}
+  button:active{transform:translateY(0)}
+  button.ghost{background:transparent; color:var(--txt); border:1px solid var(--line); box-shadow:none}
+  button.ghost:hover{border-color:var(--ice); color:var(--ice)}
+  button.red{background:linear-gradient(180deg,#ff6a73,var(--red)); color:#fff; box-shadow:0 8px 22px -10px rgba(255,59,71,.7)}
+  button:disabled{opacity:.32; cursor:not-allowed; transform:none; filter:none}
+
+  .hint{color:var(--mut); font-size:13px}
+  .err{color:var(--red); min-height:20px; font-size:14px; margin-top:8px; font-weight:600}
+
+  .roomcode{font-family:'Oswald'; font-weight:700; font-size:40px; letter-spacing:.34em; color:var(--ice); text-shadow:0 0 30px rgba(54,198,255,.4)}
+  .players-grid{display:grid; gap:10px; margin-top:6px}
+  .pchip{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:#0b1828}
+  .pchip.me{border-color:var(--ice); box-shadow:inset 0 0 0 1px rgba(54,198,255,.25)}
+  .pchip .nm{font-family:'Oswald'; font-weight:600; letter-spacing:.04em}
+  .dot{width:8px; height:8px; border-radius:50%; background:#2f9e57; display:inline-block; margin-right:8px}
+  .dot.off{background:#6b6b6b}
+  .picks-mini{font-family:'Barlow Condensed'; color:var(--mut); font-size:14px; letter-spacing:.08em}
+
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:16px}
+  .clock{font-family:'Oswald'; font-weight:700; font-size:30px; letter-spacing:.04em; color:var(--gold)}
+  .clock.low{color:var(--red); animation:pulse .8s infinite}
+  @keyframes pulse{50%{opacity:.45}}
+
+  .spinner{
+    text-align:center; padding:26px 18px; border-radius:14px; margin-bottom:16px;
+    background:radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%), #0a1828;
+    border:1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+    transition:border-color .3s;
+  }
+  .spinner .lbl{font-family:'Barlow Condensed'; text-transform:uppercase; letter-spacing:.22em; color:var(--mut); font-size:13px}
+  .spinner .team{font-family:'Oswald'; font-weight:700; font-size:clamp(28px,6vw,46px); color:var(--accent); letter-spacing:.01em; margin-top:2px; text-shadow:0 0 34px color-mix(in srgb,var(--accent) 45%, transparent)}
+  .spinner.rolling .team{animation:flick .07s steps(1) infinite}
+  @keyframes flick{50%{opacity:.25; transform:translateY(-2px)}}
+  .whose{font-family:'Barlow Condensed'; letter-spacing:.14em; text-transform:uppercase; font-size:14px; margin-top:8px}
+  .whose.you{color:var(--ice)} .whose.them{color:var(--mut)}
+
+  .draft-grid{display:grid; grid-template-columns:1fr; gap:16px}
+  @media(min-width:840px){.draft-grid{grid-template-columns:300px 1fr}}
+
+  .rostercard{background:#0b1828; border:1px solid var(--line); border-radius:14px; padding:14px}
+  .rostercard h3, .poolcard h3{font-family:'Oswald'; font-weight:600; letter-spacing:.1em; text-transform:uppercase; font-size:13px; color:var(--mut); margin-bottom:10px}
+  .slot{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:9px; border:1px solid transparent; margin-bottom:6px; background:#0a1422}
+  .slot .pos{font-family:'Oswald'; font-weight:700; width:34px; color:var(--ice); font-size:14px}
+  .slot .who{font-family:'Barlow'; font-weight:500; flex:1; font-size:15px}
+  .slot .who.empty{color:#4d647c; font-style:italic}
+  .slot.sel{border-color:var(--gold); background:#13202f; box-shadow:0 0 0 1px rgba(255,194,75,.3)}
+  .slot.fillable{cursor:pointer} .slot.fillable:hover{border-color:var(--ice)}
+  .slot .stat{font-family:'Barlow Condensed'; color:var(--mut); font-size:13px}
+
+  .poolcard{background:#0b1828; border:1px solid var(--line); border-radius:14px; padding:14px; min-height:240px}
+  .poolfilters{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px}
+  .ptab{font-family:'Oswald'; font-weight:600; font-size:12px; letter-spacing:.06em; padding:6px 11px; border-radius:8px; border:1px solid var(--line); background:#0a1626; color:var(--mut); cursor:pointer; transition:.12s}
+  .ptab:hover{border-color:var(--ice); color:var(--ice)}
+  .ptab.on{background:var(--ice); color:#04121f; border-color:var(--ice)}
+  .poolsearch{width:100%; margin-bottom:10px; font-size:15px; padding:10px 12px}
+  .prow .teamtag{font-family:'Barlow Condensed'; font-size:12px; color:var(--mut); letter-spacing:.08em; margin-right:2px}
+  .poolhint{font-family:'Barlow Condensed'; letter-spacing:.1em; text-transform:uppercase; font-size:13px; color:var(--gold); margin-bottom:10px; min-height:18px}
+  .plist{display:grid; gap:7px; max-height:430px; overflow:auto; padding-right:4px}
+  .prow{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#0a1626; transition:.12s}
+  .prow.pick{cursor:pointer} .prow.pick:hover{border-color:var(--ice); background:#0e2236; transform:translateX(2px)}
+  .prow.gone{opacity:.32; text-decoration:line-through}
+  .prow .nm{font-family:'Barlow'; font-weight:600; flex:1; font-size:15px}
+  .prow .badge{font-family:'Oswald'; font-weight:700; font-size:11px; padding:2px 7px; border-radius:6px; background:#13283d; color:var(--ice); letter-spacing:.05em}
+  .prow .num{font-family:'Barlow Condensed'; color:var(--gold); font-size:14px; min-width:54px; text-align:right}
+  .prow .takenby{font-family:'Barlow Condensed'; color:var(--red); font-size:12px; letter-spacing:.06em}
+
+  .reveal h2{font-family:'Oswald'; font-weight:700; font-size:clamp(30px,6vw,52px); text-align:center; letter-spacing:.02em}
+  .winner{color:var(--gold); text-shadow:0 0 40px rgba(255,194,75,.5)}
+  .standings{display:grid; gap:10px; margin:20px 0}
+  .srow{display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:12px; border:1px solid var(--line); background:#0b1828}
+  .srow.first{border-color:var(--gold); background:linear-gradient(90deg, rgba(255,194,75,.10), #0b1828 60%)}
+  .srow .rank{font-family:'Oswald'; font-weight:700; font-size:22px; color:var(--mut); width:30px}
+  .srow.first .rank{color:var(--gold)}
+  .srow .nm{font-family:'Oswald'; font-weight:600; flex:1; letter-spacing:.03em}
+  .srow .rec{font-family:'Oswald'; font-weight:700; font-size:18px}
+  .bigfoot{font-family:'Barlow'; font-style:italic; color:var(--txt); background:#0a1626; border-left:3px solid var(--ice); padding:14px 16px; border-radius:0 10px 10px 0; margin:18px 0; font-size:16px; line-height:1.5}
+  .bigfoot b{font-style:normal; color:var(--ice); font-family:'Oswald'; font-weight:600; letter-spacing:.05em}
+
+  /* ---- March Madness bracket grid ---- */
+  .bracket-wrap{display:flex; gap:14px; overflow-x:auto; padding:6px 2px 14px; -webkit-overflow-scrolling:touch}
+  .bg-col{flex:0 0 auto; min-width:190px; display:flex; flex-direction:column}
+  .bg-colname{font-family:'Barlow Condensed'; text-transform:uppercase; letter-spacing:.16em; color:var(--mut); font-size:12px; margin-bottom:10px; text-align:center}
+  .bg-games{display:flex; flex-direction:column; justify-content:space-around; flex:1; gap:10px}
+  .bg-game{background:#0a1626; border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; transition:.15s}
+  .bg-game:hover{border-color:var(--ice)}
+  .bg-game.mine{box-shadow:inset 0 0 0 1px rgba(54,198,255,.4)}
+  .bg-game.played{border-color:#2c4660}
+  .bg-slot{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 11px}
+  .bg-slot:first-child{border-bottom:1px solid #112236}
+  .bg-slot.win{background:rgba(255,194,75,.08)}
+  .bg-team{font-family:'Oswald'; font-weight:600; font-size:13.5px; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; color:#9fb4c9}
+  .bg-slot.win .bg-team{color:var(--txt)}
+  .bg-score{font-family:'Oswald'; font-weight:700; font-size:15px; color:var(--mut); min-width:16px; text-align:right}
+  .bg-score.w{color:var(--gold)}
+  .bg-score.q{color:#3a526b}
+  .bg-champcol{justify-content:center; min-width:150px}
+  .bg-champ{font-family:'Oswald'; font-weight:700; font-size:18px; color:#3a526b; text-align:center; padding:16px 10px; border:1px dashed var(--line); border-radius:12px}
+  .bg-champ.lit{color:var(--gold); border-color:var(--gold); border-style:solid; text-shadow:0 0 30px rgba(255,194,75,.5)}
+  .bg-game.reveal-pop{animation:revealPop .5s ease}
+  @keyframes revealPop{0%{transform:scale(1)}30%{transform:scale(1.06); border-color:var(--ice)}100%{transform:scale(1)}}
+  .bg-slot.feed-pop .bg-team{animation:feedIn .5s ease}
+  @keyframes feedIn{0%{opacity:0; transform:translateX(-6px)}100%{opacity:1; transform:translateX(0)}}
+
+  .recap-panel{margin-top:22px; border:1px solid var(--line); border-radius:14px; background:#0a1626; padding:20px 22px; animation:slideIn .5s ease}
+  .recap-title{font-family:'Oswald'; font-weight:700; letter-spacing:.12em; color:var(--ice); font-size:15px; margin-bottom:12px}
+  .recap-body p{font-family:'Barlow'; font-size:16px; line-height:1.55; color:var(--txt); margin:0 0 12px}
+  .recap-body p:last-child{margin-bottom:0}
+
+  .rtabs{display:flex; gap:8px; justify-content:center; margin-bottom:16px}
+  .rtab{font-family:'Oswald'; font-weight:600; letter-spacing:.06em; font-size:13px; text-transform:uppercase; padding:8px 20px; border-radius:22px; background:transparent; border:1px solid var(--line); color:var(--mut); cursor:pointer; transition:.15s}
+  .rtab.active{background:var(--ice); border-color:var(--ice); color:#04121f}
+  .rosters-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-top:14px}
+  .rteam{border:1px solid var(--line); border-radius:12px; background:#0a1626; overflow:hidden}
+  .rteam-head{display:flex; align-items:center; gap:8px; padding:11px 13px; cursor:pointer; user-select:none}
+  .rteam-head:hover{background:rgba(54,198,255,.05)}
+  .rteam-seed{font-family:'Oswald'; font-weight:700; color:var(--gold); font-size:13px; min-width:22px}
+  .rteam-name{font-family:'Oswald'; font-weight:600; font-size:15px; letter-spacing:.02em; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .rteam-chev{color:var(--mut); font-size:12px; transition:transform .2s}
+  .rteam.open .rteam-chev{transform:rotate(90deg)}
+  .rteam-body{display:none; padding:4px 13px 12px}
+  .rteam.open .rteam-body{display:block}
+  .rplayer{display:flex; align-items:center; gap:10px; padding:5px 0; border-top:1px solid #112236}
+  .rplayer .rpos{font-family:'Barlow Condensed'; font-size:11px; letter-spacing:.08em; color:var(--ice); min-width:26px; font-weight:600}
+  .rplayer .rname{font-family:'Barlow'; font-size:14px; color:var(--txt); flex:1}
+  .rplayer .rteamabbr{font-family:'Barlow Condensed'; font-size:11px; color:var(--mut); letter-spacing:.05em}
+
+  .box-modal{position:fixed; inset:0; background:rgba(2,8,16,.82); z-index:100; display:flex; align-items:flex-start; justify-content:center; padding:24px 14px; overflow-y:auto; backdrop-filter:blur(3px)}
+  .box-card{background:#0c1a2b; border:1px solid var(--line); border-radius:16px; width:100%; max-width:560px; padding:18px 18px 22px; box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .box-head{display:flex; align-items:center; justify-content:space-between; gap:12px}
+  .box-title{font-family:'Barlow Condensed'; text-transform:uppercase; letter-spacing:.14em; color:var(--mut); font-size:12px}
+  .box-close{background:transparent; border:1px solid var(--line); color:var(--mut); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:13px}
+  .box-close:hover{color:var(--txt); border-color:var(--ice)}
+  .box-final{font-family:'Oswald'; font-weight:700; font-size:22px; letter-spacing:.02em; margin:6px 0 14px; color:var(--txt)}
+  .box-final .bw{color:var(--gold)}
+  .box-team{margin-bottom:16px}
+  .box-team-name{font-family:'Oswald'; font-weight:600; font-size:15px; letter-spacing:.03em; margin-bottom:6px; color:var(--ice)}
+  .box-table{width:100%; border-collapse:collapse}
+  .box-table th{font-family:'Barlow Condensed'; font-size:11px; letter-spacing:.08em; color:var(--mut); text-align:right; padding:4px 6px; border-bottom:1px solid var(--line)}
+  .box-table th.l{text-align:left}
+  .box-table td{font-family:'Barlow'; font-size:13.5px; color:var(--txt); text-align:right; padding:5px 6px; border-bottom:1px solid #0f2030}
+  .box-table td.l{text-align:left}
+  .box-table td.pos{font-family:'Barlow Condensed'; color:var(--ice); font-size:11px; letter-spacing:.06em}
+  .box-goalie{font-family:'Barlow'; font-size:13px; color:var(--mut); margin-top:6px}
+  .box-goalie b{color:var(--txt); font-weight:600; font-family:'Oswald'}
+
+  @keyframes slideIn{to{opacity:1; transform:translateY(0)}}
+
+  .draftorder{display:flex; gap:6px; overflow-x:auto; padding:8px 2px; margin-bottom:6px; -webkit-overflow-scrolling:touch}
+  .do-chip{flex:0 0 auto; font-family:'Barlow Condensed'; font-size:12px; letter-spacing:.04em; color:var(--mut); background:#0a1626; border:1px solid var(--line); border-radius:20px; padding:5px 11px; white-space:nowrap}
+  .do-chip.done{opacity:.4; text-decoration:line-through}
+  .do-chip.now{color:#04121f; background:var(--ice); border-color:var(--ice); font-weight:600}
+  .do-chip .ord{color:var(--gold); font-weight:600; margin-right:4px}
+  .do-chip.now .ord{color:#04121f}
+
+  .center{text-align:center} .mt{margin-top:16px} .mt2{margin-top:24px}
+  .hide{display:none!important}
+  .footer{color:#3f566c; font-size:12px; text-align:center; margin-top:36px; letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><b>ICE</b><span>BREAKER</span></div>
+    <div class="tag">Dynasty draft · live lobby</div>
+  </header>
+
+  <section id="setup" class="card">
+    <h1>BUILD A ROSTER.<br><span class="a">SETTLE IT</span> <span class="b">ON THE ICE.</span></h1>
+    <p class="sub">Get rolled a random NHL team, draft one of their guys, fill six spots before the clock dies. Then your squad plays everyone else's. This year's players, this year's numbers. No console required.</p>
+    <div class="mt2 row">
+      <input id="name" placeholder="Your name" maxlength="14" autocomplete="off">
+    </div>
+    <div class="mt row">
+      <button onclick="create()">Create a lobby</button>
+      <span class="hint">— or join one —</span>
+      <input id="code" class="code-in" placeholder="CODE" maxlength="4" autocomplete="off">
+      <button class="ghost" onclick="join()">Join</button>
+    </div>
+    <div class="err" id="setupErr"></div>
+  </section>
+
+  <section id="lobby" class="card hide">
+    <div class="tag">Lobby code — text it to your group</div>
+    <div class="roomcode mt" id="roomCode">----</div>
+    <div class="players-grid mt2" id="lobbyPlayers"></div>
+    <div class="mt2 row">
+      <button id="readyBtn" onclick="toggleReady()">Ready up</button>
+      <button id="startBtn" onclick="start()" disabled>Start the draft</button>
+      <button class="ghost" id="autoBtn" onclick="autoDraft()">Auto-draft me</button>
+      <span class="hint" id="lobbyHint"></span>
+    </div>
+    <div class="bigfoot mt2"><b>BIGFOOT SAYS:</b> <span id="lobbyFoot">ready up. empty seats get filled with goons of my choosing.</span></div>
+    <div class="err" id="lobbyErr"></div>
+  </section>
+
+  <section id="draft" class="card hide">
+    <div class="topbar">
+      <div class="tag">Draft in progress · <span id="dRoom"></span></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="ghost" style="padding:7px 12px;font-size:12px" onclick="autoDraft()">Auto-draft rest</button>
+        <div class="clock" id="clock">0:45</div>
+      </div>
+    </div>
+    <div class="spinner" id="spinner">
+      <div class="lbl">On the clock</div>
+      <div class="team" id="pickerName">—</div>
+      <div class="whose" id="whose">—</div>
+    </div>
+    <div class="draftorder" id="draftOrder"></div>
+    <div class="draft-grid">
+      <div class="rostercard">
+        <h3>Your roster</h3>
+        <div id="myRoster"></div>
+      </div>
+      <div class="poolcard">
+        <h3>Available players</h3>
+        <div class="poolhint" id="poolHint"></div>
+        <div class="poolfilters" id="posTabs"></div>
+        <input id="search" class="poolsearch" placeholder="Search any player…" autocomplete="off" oninput="renderDraft()">
+        <div class="plist" id="pool"></div>
+      </div>
+    </div>
+    <div class="err" id="draftErr"></div>
+  </section>
+
+  <section id="reveal" class="card reveal hide">
+    <div class="rtabs">
+      <button class="rtab active" id="tabBracket" onclick="showRevealTab('bracket')">Bracket</button>
+      <button class="rtab" id="tabRosters" onclick="showRevealTab('rosters')">Rosters</button>
+    </div>
+
+    <!-- BRACKET VIEW (the whole reveal happens here now) -->
+    <div id="bracketView" class="hide">
+      <div class="tag center" id="bracketTag">The Bracket</div>
+      <h2 class="mt" id="champLine" style="display:none">🏆 <span class="winner" id="champName">—</span> takes the cup</h2>
+      <div class="bracket-wrap" id="bracket"></div>
+      <div class="bigfoot" id="revealFoot"></div>
+
+      <!-- LEAGUE RECAP (shown after the bracket finishes) -->
+      <div id="recapPanel" class="recap-panel" style="display:none">
+        <div class="recap-title">🏒 THE RECAP</div>
+        <div class="recap-body" id="recapBody"></div>
+      </div>
+
+      <div class="center mt" id="revealButtons" style="display:none">
+        <button class="red" onclick="shareResult()" id="shareBtn">Copy the brag</button>
+        <button class="ghost" onclick="location.reload()">Run it back</button>
+      </div>
+      <div class="center mt2"><button class="ghost" style="font-size:12px;padding:7px 12px" onclick="replayReveal()">↻ Replay the bracket</button></div>
+      <div class="hint center mt" id="shareNote"></div>
+    </div>
+
+    <!-- ROSTERS VIEW -->
+    <div id="rostersView" class="hide">
+      <div class="tag center">Every team's draft — tap to expand</div>
+      <div class="rosters-grid" id="rostersGrid"></div>
+    </div>
+  </section>
+
+  <div class="footer">ICEBREAKER · current-season NHL data, playoffs excluded · independent fan project, not affiliated with the NHL or NHLPA</div>
+</div>
+
+<!-- BOX SCORE MODAL -->
+<div id="boxModal" class="box-modal hide" onclick="closeBox(event)">
+  <div class="box-card" onclick="event.stopPropagation()">
+    <div class="box-head">
+      <div class="box-title" id="boxTitle">—</div>
+      <button class="box-close" onclick="closeBox()">✕</button>
+    </div>
+    <div class="box-final" id="boxFinal">—</div>
+    <div id="boxTeams"></div>
+  </div>
+</div>
+
+<script>
+const SLOTS=["LW","C","RW","LD","RD","G"];
+let ws, myName, state=null, pendingSlot=null;
+
+function $(id){return document.getElementById(id)}
+function show(sec){["setup","lobby","draft","reveal"].forEach(s=>$(s).classList.toggle("hide", s!==sec))}
+function flash(msg, where){ const el=$(where); el.textContent=msg; setTimeout(()=>{if(el.textContent===msg)el.textContent="";},2600);}
+
+function connect(then){
+  const proto=location.protocol==="https:"?"wss":"ws";
+  ws=new WebSocket(`${proto}://${location.host}`);
+  ws.onopen=then;
+  ws.onmessage=e=>handle(JSON.parse(e.data));
+  ws.onclose=()=>flash("Lost connection to the lobby.","setupErr");
+  ws.onerror=()=>flash("Connection trouble — try again.","setupErr");
+}
+function send(o){ws.send(JSON.stringify(o))}
+function val(id){return $(id).value.trim()}
+
+function create(){ myName=val("name")||"Host"; connect(()=>send({type:"create",name:myName})); }
+function join(){ myName=val("name")||"Player"; const c=val("code"); if(c.length<4)return flash("Enter the 4-letter code.","setupErr"); connect(()=>send({type:"join",name:myName,code:c})); }
+function start(){ send({type:"start"}); }
+function toggleReady(){ send({type:"ready"}); }
+
+function handle(m){
+  if(m.type==="joined"){ $("roomCode").textContent=m.code; $("dRoom").textContent=m.code; show("lobby"); return; }
+  if(m.type==="error"){ const where = state&&state.state==="drafting" ? "draftErr" : (!$("lobby").classList.contains("hide")?"lobbyErr":"setupErr"); flash(bigfootError(m.msg), where); return; }
+  if(m.type==="state"){ state=m; render(); }
+}
+
+function bigfootError(msg){
+  const map={ "not your turn":"not your turn yet. patience.", "already taken":"too slow — somebody grabbed him.",
+    "slot filled":"that spot's already full.", "Need at least 2 players":"need 2+ people to drop the puck.",
+    "Draft already started":"that draft already started without you.",
+    "wrong position":"he doesn't play that position." };
+  for(const k in map) if(msg.startsWith(k)) return map[k];
+  return msg;
+}
+
+let posFilter = "ALL";
+function setPos(p){ posFilter = p; renderDraft(); }
+
+function render(){
+  if(state.state==="lobby") renderLobby();
+  if(state.state==="drafting"){ show("draft"); renderDraft(); }
+  if(state.state==="reveal"){ show("reveal"); renderReveal(); }
+}
+
+function renderLobby(){
+  show("lobby");
+  $("roomCode").textContent=state.code;
+  $("lobbyPlayers").innerHTML = state.players.map(p=>{
+    const me=p.name===myName?" me":"";
+    const status = p.ready ? `<span class="picks-mini" style="color:#9ff5b0">✓ ready</span>`
+                           : `<span class="picks-mini">not ready</span>`;
+    return `<div class="pchip${me}"><span class="nm"><span class="dot${p.connected?"":" off"}"></span>${esc(p.name)}${me?" (you)":""}</span>${status}</div>`;
+  }).join("");
+
+  const me = state.players.find(p=>p.name===myName);
+  const iAmReady = me && me.ready;
+  $("readyBtn").textContent = iAmReady ? "Unready" : "Ready up";
+  $("readyBtn").className = iAmReady ? "ghost" : "";
+
+  const canStart = (state.readyCount||0) >= (state.minHumans||2);
+  $("startBtn").disabled = !canStart;
+  const need = (state.minHumans||2);
+  const empties = (state.bracketSize||16) - (state.humanCount||0);
+  $("lobbyHint").textContent = canStart
+    ? `Good to go — ${empties} empty seat${empties===1?"":"s"} will fill with goons.`
+    : `${state.readyCount||0}/${need} readied up — need ${need} to start.`;
+}
+
+function renderDraft(){
+  const s=state.secondsLeft??0, mm=Math.floor(s/60), ss=String(s%60).padStart(2,"0");
+  const clk=$("clock"); clk.textContent=`${mm}:${ss}`; clk.classList.toggle("low", s<=15);
+
+  const myTurn = state.currentPicker===myName;
+
+  // banner shows whose name is on the clock
+  $("pickerName").textContent = (state.currentPicker||"—").toUpperCase();
+  const who=$("whose");
+  who.textContent = myTurn ? "THAT'S YOU — PICK SOMEBODY" : "ON THE CLOCK";
+  who.className = "whose " + (myTurn?"you":"them");
+
+  // draft order banner — highlights who's on the clock now
+  const order=state.turnOrder||[];
+  const cur=state.currentPicker;
+  $("draftOrder").innerHTML = order.map((nm,i)=>{
+    const cls = nm===cur ? "now" : "";
+    const meMark = nm===myName ? " ★" : "";
+    return `<span class="do-chip ${cls}"><span class="ord">${i+1}</span>${esc(nm)}${meMark}</span>`;
+  }).join("");
+
+  const me=state.players.find(p=>p.name===myName);
+  $("myRoster").innerHTML = SLOTS.map(slot=>{
+    const pick = me && me.roster[slot];
+    const sel = pendingSlot===slot?" sel":"";
+    const fillable = myTurn && !pick ? " fillable":"";
+    const stat = pick ? (pick.isGoalie?`${(pick.savePct||0).toFixed(3)} SV%`:`${(pick.ppg||0).toFixed(2)} P/GP`) : "";
+    return `<div class="slot${sel}${fillable}" ${fillable?`onclick="pickSlot('${slot}')"`:""}>
+      <span class="pos">${slot}</span>
+      <span class="who ${pick?"":"empty"}">${pick?esc(pick.name):"open"}</span>
+      <span class="stat">${stat}</span></div>`;
+  }).join("");
+
+  const openSlots = me ? SLOTS.filter(s=>!me.roster[s]) : [];
+
+  // position tabs (ALL + each slot you still need)
+  const tabs = ["ALL", ...SLOTS];
+  $("posTabs").innerHTML = tabs.map(t=>{
+    const on = posFilter===t ? " on":"";
+    return `<span class="ptab${on}" onclick="setPos('${t}')">${t}</span>`;
+  }).join("");
+
+  $("poolHint").textContent = !myTurn ? "Hang tight — not your pick." :
+    (pendingSlot ? `Picking for ${pendingSlot} — tap a player` : "Tap an open slot on the left, then pick anyone in the league");
+
+  const q = ($("search").value||"").toLowerCase().trim();
+  let list = state.pool.slice();
+  if(posFilter!=="ALL") list = list.filter(p=>p.slots.includes(posFilter));
+  if(q) list = list.filter(p=>p.name.toLowerCase().includes(q));
+  // sort: available first, then skaters before goalies, then by goals (skaters)
+  // / save% (goalies), both descending — so goal leaders sit at the top
+  list.sort((a,b)=>
+    (a.takenBy?1:0)-(b.takenBy?1:0)            // taken players sink
+    || (a.isGoalie?1:0)-(b.isGoalie?1:0)        // skaters above goalies
+    || (a.isGoalie ? (b.savePct||0)-(a.savePct||0) : (b.goals||0)-(a.goals||0))
+    || (b.points||0)-(a.points||0)              // tiebreak: total points
+  );
+  list = list.slice(0, 200); // cap render for performance; search/tabs narrow it
+
+  $("pool").innerHTML = list.map(p=>{
+    const fitsOpen = p.slots.some(s=>openSlots.includes(s));
+    const fitsPending = pendingSlot ? p.slots.includes(pendingSlot) : true;
+    const pickable = myTurn && !p.takenBy && fitsOpen && fitsPending;
+    const num = p.isGoalie ? `${(p.savePct||0).toFixed(3)}` : `${p.goals||0} G`;
+    const sub = p.isGoalie ? "SV%" : `${p.points||0} PTS`;
+    return `<div class="prow ${p.takenBy?"gone":""} ${pickable?"pick":""}" ${pickable?`onclick="doPick(${p.id})"`:""}>
+      <span class="badge">${p.slots.join("/")}</span>
+      <span class="teamtag">${p.team}</span>
+      <span class="nm">${esc(p.name)}</span>
+      ${p.takenBy?`<span class="takenby">— ${esc(p.takenBy)}</span>`:`<span class="num">${num} <span style="color:var(--mut)">${sub}</span></span>`}
+    </div>`;
+  }).join("") || `<div class="hint">No players match — clear the search or pick another position.</div>`;
+}
+
+function pickSlot(s){ pendingSlot = pendingSlot===s?null:s; renderDraft(); }
+function doPick(id){
+  const me=state.players.find(p=>p.name===myName);
+  const p=state.pool.find(x=>x.id===id);
+  if(!pendingSlot){
+    const open=SLOTS.filter(s=>!me.roster[s]).filter(s=>p.slots.includes(s));
+    if(open.length===1) pendingSlot=open[0];
+    else return flash("Tap which spot he fills first.","draftErr");
+  }
+  send({type:"pick", playerId:id, slot:pendingSlot});
+  pendingSlot=null;
+}
+
+// ---- AUTO-DRAFT ----
+function autoDraft(){ send({type:"autodraft"}); }
+
+// ---- COLUMN-BY-COLUMN REVEAL ----
+// Show the full bracket with scores hidden. Reveal round by round, top to bottom:
+// each matchup's score lights up ~1.5s apart; when a round finishes, the next
+// round's matchups (already in the data) start revealing. End on a league recap.
+let revealStarted=false, playTimers=[];
+let revealedKeys=new Set();          // "round|gi" whose score is shown
+let shownNames=new Set();            // "round|gi|slot" whose team name is shown
+const MATCHUP_MS=1500;               // beat between matchup reveals
+const ROUND_GAP_MS=900;              // extra pause between rounds
+
+function gkey(roundName, gi){ return roundName+"|"+gi; }
+function clearTimers(){ playTimers.forEach(t=>clearTimeout(t)); playTimers=[]; }
+
+function renderReveal(){
+  if(revealStarted) return;
+  revealStarted=true;
+  console.log("[ICEBREAKER] reveal starting — rounds:", (state.result&&state.result.rounds||[]).length);
+  revealedKeys=new Set();
+  shownNames=new Set();
+  revealTab="bracket";
+  $("tabBracket").classList.add("active");
+  $("tabRosters").classList.remove("active");
+  drawBracket(false);
+  showView("bracket");
+  startRevealAnimation();
+}
+
+// Manual replay: reset reveal state and play the whole thing again.
+function replayReveal(){
+  revealedKeys=new Set();
+  shownNames=new Set();
+  $("recapPanel").style.display="none";
+  $("revealButtons").style.display="none";
+  drawBracket(false);
+  showView("bracket");
+  startRevealAnimation();
+}
+
+// Separated so a manual button can (re)trigger it if needed.
+function startRevealAnimation(){
+  clearTimers();
+  const r=state.result||{rounds:[]};
+  const order=[];
+  r.rounds.forEach(rd=>rd.games.forEach((g,gi)=>order.push({round:rd.name, gi})));
+  let delay=1200;                    // initial beat so the bracket is seen first
+  let lastRound=order.length?order[0].round:null;
+  order.forEach((m)=>{
+    if(m.round!==lastRound){ delay+=ROUND_GAP_MS; lastRound=m.round; }
+    playTimers.push(setTimeout(()=>revealMatchup(m.round, m.gi), delay));
+    delay+=MATCHUP_MS;
+  });
+  playTimers.push(setTimeout(()=>finishReveal(), delay+400));
+}
+
+let revealTab="bracket";   // which reveal tab is active
+
+// ---- BOX SCORE MODAL ----
+function openBox(roundName, gi){
+  const rd=(state.result.rounds||[]).find(r=>r.name===roundName);
+  if(!rd) return;
+  const g=rd.games[gi];
+  if(!g || !g.box) return;
+  const aWin=g.winner===g.a;
+  $("boxTitle").textContent=roundName;
+  $("boxFinal").innerHTML=`<span class="${aWin?'bw':''}">${esc(g.a)} ${g.ga}</span> — <span class="${aWin?'':'bw'}">${g.gb} ${esc(g.b)}</span>${g.ot?' <span style="color:var(--mut);font-size:14px">(OT)</span>':''}`;
+  $("boxTeams").innerHTML = teamBoxHtml(g.box.a) + teamBoxHtml(g.box.b);
+  $("boxModal").classList.remove("hide");
+}
+function teamBoxHtml(t){
+  const rows=(t.skaters||[]).map(s=>`<tr>
+    <td class="l pos">${esc(s.pos)}</td>
+    <td class="l">${esc(s.name)}</td>
+    <td>${s.g}</td><td>${s.a}</td><td>${s.pts}</td>
+    <td>${s.pm>=0?'+':''}${s.pm}</td><td>${s.hits}</td>
+  </tr>`).join("");
+  const gl=t.goalie ? `<div class="box-goalie"><b>${esc(t.goalie.name)}</b> — ${t.goalie.saves} saves, ${t.goalie.ga} GA (${t.goalie.shots} shots)</div>` : "";
+  return `<div class="box-team">
+    <div class="box-team-name">${esc(t.name)}</div>
+    <table class="box-table">
+      <thead><tr><th class="l">POS</th><th class="l">SKATER</th><th>G</th><th>A</th><th>P</th><th>+/-</th><th>HIT</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>${gl}
+  </div>`;
+}
+function closeBox(){
+  $("boxModal").classList.add("hide");
+}
+
+function showView(which){
+  // reveal animation calls this; only actually show bracket if that tab is active
+  applyRevealTab();
+}
+
+function showRevealTab(which){
+  revealTab=which;
+  $("tabBracket").classList.toggle("active", which==="bracket");
+  $("tabRosters").classList.toggle("active", which==="rosters");
+  if(which==="rosters") renderRosters();
+  applyRevealTab();
+}
+
+function applyRevealTab(){
+  $("bracketView").classList.toggle("hide", revealTab!=="bracket");
+  $("rostersView").classList.toggle("hide", revealTab!=="rosters");
+}
+
+function renderRosters(){
+  const rosters=(state.result&&state.result.rosters)||[];
+  $("rostersGrid").innerHTML = rosters.map((t,i)=>{
+    const meMark = t.name===myName ? " ★" : "";
+    const players = t.players.map(p=>`
+      <div class="rplayer">
+        <span class="rpos">${esc(p.pos||p.slot)}</span>
+        <span class="rname">${esc(p.name)}</span>
+        <span class="rteamabbr">${esc(p.team||"")}</span>
+      </div>`).join("");
+    return `<div class="rteam" id="rteam-${i}">
+      <div class="rteam-head" onclick="document.getElementById('rteam-${i}').classList.toggle('open')">
+        <span class="rteam-seed">#${t.seed}</span>
+        <span class="rteam-name">${esc(t.name)}${meMark}</span>
+        <span class="rteam-chev">▶</span>
+      </div>
+      <div class="rteam-body">${players}</div>
+    </div>`;
+  }).join("") || `<div class="hint">No rosters to show.</div>`;
+}
+
+// Build the bracket grid. First-round names always show. Later-round names show
+// ONLY once a prior game has fed a winner into that slot (tracked in shownNames).
+// Scores show only once that specific game is revealed.
+function drawBracket(final){
+  const r=state.result;
+  const firstRound = (r.rounds&&r.rounds[0])?r.rounds[0].name:null;
+  let cols="";
+  (r.rounds||[]).forEach(rd=>{
+    let games="";
+    rd.games.forEach((g,gi)=>{
+      const key=gkey(rd.name,gi);
+      const shown = final || revealedKeys.has(key);
+      const aWin=g.winner===g.a;
+      // a name shows if: final, first round, a bye into this slot, or it was fed
+      const aNameVis = final || rd.name===firstRound || g.aFromGame===false || shownNames.has(key+"|a");
+      const bNameVis = final || rd.name===firstRound || g.bFromGame===false || shownNames.has(key+"|b");
+      const aName = aNameVis ? esc(g.a) : "";
+      const bName = bNameVis ? esc(g.b) : "";
+      const aScore = shown ? `<span class="bg-score ${aWin?'w':''}">${g.ga}</span>` : `<span class="bg-score q">·</span>`;
+      const bScore = shown ? `<span class="bg-score ${aWin?'':'w'}">${g.gb}</span>` : `<span class="bg-score q">·</span>`;
+      const mine=(g.a===myName||g.b===myName)&&(aNameVis||bNameVis);
+      const clickable = shown ? ` style="cursor:pointer" onclick="openBox('${esc(rd.name)}',${gi})"` : "";
+      games += `<div class="bg-game${mine?' mine':''}${shown?' played':''}" id="g-${esc(key)}"${clickable}>
+        <div class="bg-slot ${shown&&aWin?'win':''}"><span class="bg-team">${aName}</span>${shown?aScore:''}</div>
+        <div class="bg-slot ${shown&&!aWin?'win':''}"><span class="bg-team">${bName}</span>${shown?bScore:''}</div>
+      </div>`;
+    });
+    cols += `<div class="bg-col"><div class="bg-colname">${esc(rd.name)}</div><div class="bg-games">${games}</div></div>`;
+  });
+  const champShown=final;
+  cols += `<div class="bg-col bg-champcol"><div class="bg-colname">Champion</div>
+    <div class="bg-champ${champShown?' lit':''}">${champShown?('🏆 '+esc(r.champion)):'· · ·'}</div></div>`;
+  $("bracket").innerHTML=cols;
+
+  if(final){
+    $("bracketTag").textContent="Final bracket";
+  } else {
+    $("bracketTag").textContent="The bracket is set. Watch it play out.";
+    $("champLine").style.display="none";
+    $("revealButtons").style.display="none";
+    $("revealFoot").innerHTML="";
+  }
+}
+
+// Reveal one matchup's score, then feed its winner's NAME into the next round's
+// correct slot (so future rounds populate only as games finish).
+function revealMatchup(roundName, gi){
+  const r=state.result;
+  const rounds=r.rounds||[];
+  const ri=rounds.findIndex(x=>x.name===roundName);
+  if(ri<0) return;
+  const rd=rounds[ri];
+  const g=rd.games[gi];
+  if(!g) return;
+  revealedKeys.add(gkey(roundName,gi));
+  const node=document.getElementById("g-"+gkey(roundName,gi));
+  if(node){
+    const aWin=g.winner===g.a;
+    node.classList.add("played","reveal-pop");
+    node.style.cursor="pointer";
+    node.onclick=()=>openBox(roundName, gi);
+    const slots=node.querySelectorAll(".bg-slot");
+    if(slots[0]){ slots[0].classList.toggle("win",aWin);
+      slots[0].innerHTML=`<span class="bg-team">${esc(g.a)}</span><span class="bg-score ${aWin?'w':''}">${g.ga}</span>`; }
+    if(slots[1]){ slots[1].classList.toggle("win",!aWin);
+      slots[1].innerHTML=`<span class="bg-team">${esc(g.b)}</span><span class="bg-score ${aWin?'':'w'}">${g.gb}</span>`; }
+  }
+  // feed the winner into the next round's slot using the SERVER's explicit map
+  if(g.feedRound!=null && g.feedSlot){
+    const next=rounds[g.feedRound];
+    if(next){
+      shownNames.add(gkey(next.name,g.feedGi)+"|"+g.feedSlot);
+      const nnode=document.getElementById("g-"+gkey(next.name,g.feedGi));
+      if(nnode){
+        const slotEl=nnode.querySelectorAll(".bg-slot")[g.feedSlot==="a"?0:1];
+        if(slotEl){ const t=slotEl.querySelector(".bg-team"); if(t){ t.textContent=g.winner; slotEl.classList.add("feed-pop"); } }
+      }
+    }
+  }
+}
+
+function finishReveal(){
+  clearTimers();
+  // light the champion column
+  const champEl=document.querySelector(".bg-champ");
+  if(champEl){ champEl.classList.add("lit"); champEl.innerHTML="🏆 "+esc((state.result||{}).champion||""); }
+  $("bracketTag").textContent="Final bracket";
+  // show the league recap panel
+  showRecap();
+}
+
+// ---- LEAGUE RECAP (template now; AI later) ----
+function showRecap(){
+  const r=state.result||{standings:[],rounds:[],champion:null};
+  const recap = (r.recap && r.recap.length) ? r.recap : templateRecap(r);
+  $("recapBody").innerHTML = recap.map(p=>`<p>${esc(p)}</p>`).join("");
+  $("recapPanel").style.display="block";
+  $("revealButtons").style.display="block";
+  // smooth scroll the recap into view
+  playTimers.push(setTimeout(()=>$("recapPanel").scrollIntoView({behavior:"smooth", block:"start"}), 300));
+}
+
+// Fallback recap if the server didn't supply an AI one.
+function templateRecap(r){
+  const s=r.standings||[];
+  if(!s.length) return ["The league never happened. Everybody stayed home. Bigfoot is disappointed in all of you."];
+  const champ=r.champion;
+  const best=s[0];                                   // champion / top
+  const worst=s[s.length-1];
+  // find a blowout and a nail-biter across all games
+  let blowout=null, thriller=null;
+  (r.rounds||[]).forEach(rd=>rd.games.forEach(g=>{
+    const m=Math.abs(g.ga-g.gb), tot=g.ga+g.gb;
+    if(!blowout || m>Math.abs(blowout.ga-blowout.gb)) blowout=g;
+    if(!thriller || (m===1 && tot>(thriller.ga+thriller.gb))) if(m<=1) thriller=g;
+  }));
+  const p1=`${champ} is your ICEBREAKER champion, and honestly nobody should be surprised except everyone who drafted against them. They went ${best.wins}-${best.losses} and left a trail of bodies from the Round of 16 to the Final. Hang the banner, annoy your group chat, become insufferable. You've earned it.`;
+  const p2 = blowout ? `The biggest beatdown of the tournament: ${blowout.winner} ${Math.max(blowout.ga,blowout.gb)}-${Math.min(blowout.ga,blowout.gb)} over ${blowout.winner===blowout.a?blowout.b:blowout.a}. That wasn't a hockey game, that was a crime scene. Somewhere a goalie is still apologizing to his teammates.` : `There were games. People won them. It was fine.`;
+  const p3=`And then there's ${worst.name}, who finished dead last at ${worst.wins}-${worst.losses} and should not be allowed near a draft board again without adult supervision. ${worst.name}, the league thanks you for your participation and respectfully requests you try literally anything different next time. Everybody else — run it back.`;
+  return [p1,p2,p3];
+}
+
+function bigfootVerdict(r){
+  const s = r.standings||[];
+  if(!s.length) return "everybody went home. nobody wins. embarrassing.";
+  if(s.length===1) return `${s[0].name} drafted alone and won a league of one. cool.`;
+  const w=r.champion, l=s[s.length-1];
+  const lines=[
+    `${w} built something nasty. ${l.name}, we don't talk about that roster.`,
+    `${w} skates with the cup. the rest of you are golfing in april.`,
+    `${w} cooked. ${l.name}, respectfully, what was that.`,
+    `${w} took the whole thing. ${l.name} got bounced and deserved it.`,
+  ];
+  return lines[Math.floor(Math.random()*lines.length)];
+}
+
+function shareResult(){
+  const r=state.result||{standings:[]}; const champ=r.champion;
+  const me=r.standings.find(t=>t.name===myName);
+  let txt=`🏒 ICEBREAKER\n🏆 ${champ} won the cup\n`;
+  if(me){
+    txt += me.name===champ
+      ? `I went ${me.wins}-${me.losses} and took it all. not humble about it.\n`
+      : `I went ${me.wins}-${me.losses}, out in the ${me.eliminatedIn||"early rounds"}. running it back.\n`;
+  }
+  txt+=`build yours: ${location.origin}`;
+  navigator.clipboard.writeText(txt).then(
+    ()=>{ $("shareNote").textContent="Copied — paste it in the group chat."; },
+    ()=>{ $("shareNote").textContent=txt; }
+  );
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+</script>
+</body>
+</html>
