@@ -83,8 +83,23 @@ function makeRoom() {
     turnIdx: 0,
     pickDeadline: null,
     timer: null,
+    hb: null,           // lobby heartbeat interval
   };
   rooms.set(cd, room);
+  // Heartbeat: every few seconds, re-push the authoritative roster so a single
+  // dropped message can't leave anyone's lobby list stale, and prune dead sockets.
+  room.hb = setInterval(() => {
+    for (const ws of [...room.players.keys()]) {
+      if (ws.readyState !== ws.OPEN) {
+        // socket is dead but never fired close — clean it up
+        const p = room.players.get(ws);
+        if (room.state === "lobby") room.players.delete(ws);
+        else if (p) p.connected = false;
+      }
+    }
+    if (room.players.size === 0 && room.state === "lobby") { clearInterval(room.hb); rooms.delete(room.code); return; }
+    broadcast(room);
+  }, 4000);
   return room;
 }
 
@@ -94,6 +109,12 @@ function entrants(room) {
 }
 function findEntrant(room, name) {
   return entrants(room).find(p => p.name === name);
+}
+// Find the [ws, player] pair for a persistent player id (survives reconnects).
+function findByPid(room, pid) {
+  if (!pid) return null;
+  for (const [ws, p] of room.players) if (p.pid === pid) return [ws, p];
+  return null;
 }
 
 // Snake draft: round 0 goes 0..N-1, round 1 goes N-1..0, round 2 forward, etc.
@@ -453,20 +474,41 @@ wss.on("connection", (ws) => {
 
     if (m.type === "create") {
       const room = makeRoom();
-      room.players.set(ws, { name: m.name || "Player", roster: {}, ready: false, connected: true });
-      ws.room = room;
-      ws.send(JSON.stringify({ type: "joined", code: room.code }));
+      const pid = m.pid || (Math.random().toString(36).slice(2) + Date.now().toString(36));
+      room.players.set(ws, { pid, name: m.name || "Player", roster: {}, ready: false, connected: true });
+      ws.room = room; ws.pid = pid;
+      ws.send(JSON.stringify({ type: "joined", code: room.code, pid }));
       broadcast(room);
     }
 
     if (m.type === "join") {
       const room = rooms.get((m.code || "").toUpperCase());
       if (!room) return ws.send(JSON.stringify({ type: "error", msg: "Room not found" }));
+      const pid = m.pid || (Math.random().toString(36).slice(2) + Date.now().toString(36));
+
+      // Reconnect path: same person (by pid) is already in this room.
+      // Reattach their NEW socket to the EXISTING entry — no duplicate.
+      const existing = findByPid(room, pid);
+      if (existing) {
+        const [oldWs, p] = existing;
+        if (oldWs !== ws) {
+          room.players.delete(oldWs);
+          try { if (oldWs.readyState === oldWs.OPEN) oldWs.close(); } catch {}
+        }
+        p.connected = true;
+        if (m.name) p.name = m.name;
+        room.players.set(ws, p);
+        ws.room = room; ws.pid = pid;
+        ws.send(JSON.stringify({ type: "joined", code: room.code, pid }));
+        return broadcast(room);
+      }
+
+      // New player joining a room mid-lobby.
       if (room.state !== "lobby") return ws.send(JSON.stringify({ type: "error", msg: "Draft already started" }));
       if (room.players.size >= BRACKET_SIZE) return ws.send(JSON.stringify({ type: "error", msg: "Lobby is full (16 max)" }));
-      room.players.set(ws, { name: m.name || "Player", roster: {}, ready: false, connected: true });
-      ws.room = room;
-      ws.send(JSON.stringify({ type: "joined", code: room.code }));
+      room.players.set(ws, { pid, name: m.name || "Player", roster: {}, ready: false, connected: true });
+      ws.room = room; ws.pid = pid;
+      ws.send(JSON.stringify({ type: "joined", code: room.code, pid }));
       broadcast(room);
     }
 
@@ -506,8 +548,21 @@ wss.on("connection", (ws) => {
     const room = ws.room;
     if (!room) return;
     const player = room.players.get(ws);
-    if (player) player.connected = false; // keep their picks; don't freeze the room
-    // if it was their turn during draft, advance so the room doesn't stall
+    if (!player) return; // socket was already replaced by a reconnect — nothing to do
+
+    if (room.state === "lobby") {
+      // In the lobby, a disconnect means they're gone — remove them so they
+      // don't linger as a ghost. (A reconnect comes in as a fresh join by pid.)
+      room.players.delete(ws);
+      // empty room? clean it up so codes don't pile up in memory
+      if (room.players.size === 0) { try { clearInterval(room.hb); } catch {}; rooms.delete(room.code); return; }
+      broadcast(room);
+      return;
+    }
+
+    // During draft/reveal, keep their picks so the bracket stays intact;
+    // just mark them disconnected and advance if it was their turn.
+    player.connected = false;
     if (room.state === "drafting" && pickerAt(room, room.turnIdx) === player?.name) {
       room.turnIdx++;
       beginTurn(room);
