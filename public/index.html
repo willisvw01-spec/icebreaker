@@ -361,8 +361,7 @@ let ws, myName, state=null, pendingSlot=null;
 let myPid = null;
 try { myPid = localStorage.getItem("ib_pid"); } catch {}
 if(!myPid){ myPid = Math.random().toString(36).slice(2)+Date.now().toString(36); try{ localStorage.setItem("ib_pid", myPid); }catch{} }
-let myCode = null;            // current room code, remembered for reconnect
-try { myCode = sessionStorage.getItem("ib_code"); } catch {}
+let myCode = null;            // current room code (set when you create/join this session)
 try { myName = sessionStorage.getItem("ib_name") || null; } catch {}
 
 function $(id){return document.getElementById(id)}
@@ -390,8 +389,9 @@ function connect(then){
 function send(o){ws.send(JSON.stringify(o))}
 function val(id){return $(id).value.trim()}
 
-function create(){ myName=val("name")||"Host"; rememberName(); connect(()=>send({type:"create",name:myName,pid:myPid})); }
-function join(){ myName=val("name")||"Player"; rememberName(); const c=val("code"); if(c.length<4)return flash("Enter the 4-letter code.","setupErr"); myCode=c.toUpperCase(); connect(()=>send({type:"join",name:myName,code:myCode,pid:myPid})); }
+function clearSession(){ myCode=null; state=null; try{ sessionStorage.removeItem("ib_code"); }catch{} }
+function create(){ clearSession(); myName=val("name")||"Host"; rememberName(); connect(()=>send({type:"create",name:myName,pid:myPid})); }
+function join(){ clearSession(); myName=val("name")||"Player"; rememberName(); const c=val("code"); if(c.length<4)return flash("Enter the 4-letter code.","setupErr"); myCode=c.toUpperCase(); connect(()=>send({type:"join",name:myName,code:myCode,pid:myPid})); }
 function start(){ send({type:"start"}); }
 function toggleReady(){ send({type:"ready"}); }
 function rememberName(){ try{ sessionStorage.setItem("ib_name", myName); }catch{} }
@@ -410,11 +410,6 @@ function handle(m){
   }
   if(m.type==="state"){ state=m; render(); }
 }
-
-// On page load, if we have a remembered room, try to rejoin our seat silently.
-window.addEventListener("load", ()=>{
-  if(myCode){ connect(()=>send({type:"join",name:myName||"Player",code:myCode,pid:myPid})); }
-});
 
 function bigfootError(msg){
   const map={ "not your turn":"not your turn yet. patience.", "already taken":"too slow — somebody grabbed him.",
