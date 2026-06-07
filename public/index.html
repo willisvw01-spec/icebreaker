@@ -356,31 +356,65 @@
 const SLOTS=["LW","C","RW","LD","RD","G"];
 let ws, myName, state=null, pendingSlot=null;
 
+// Persistent identity so a refresh/reconnect re-attaches to the SAME seat
+// instead of creating a duplicate "ghost" player.
+let myPid = null;
+try { myPid = localStorage.getItem("ib_pid"); } catch {}
+if(!myPid){ myPid = Math.random().toString(36).slice(2)+Date.now().toString(36); try{ localStorage.setItem("ib_pid", myPid); }catch{} }
+let myCode = null;            // current room code, remembered for reconnect
+try { myCode = sessionStorage.getItem("ib_code"); } catch {}
+try { myName = sessionStorage.getItem("ib_name") || null; } catch {}
+
 function $(id){return document.getElementById(id)}
 function show(sec){["setup","lobby","draft","reveal"].forEach(s=>$(s).classList.toggle("hide", s!==sec))}
 function flash(msg, where){ const el=$(where); el.textContent=msg; setTimeout(()=>{if(el.textContent===msg)el.textContent="";},2600);}
 
+let reconnectTimer=null;
 function connect(then){
   const proto=location.protocol==="https:"?"wss":"ws";
   ws=new WebSocket(`${proto}://${location.host}`);
   ws.onopen=then;
   ws.onmessage=e=>handle(JSON.parse(e.data));
-  ws.onclose=()=>flash("Lost connection to the lobby.","setupErr");
-  ws.onerror=()=>flash("Connection trouble — try again.","setupErr");
+  ws.onclose=()=>{
+    // If we were in a room, quietly reconnect to our seat by pid.
+    if(myCode){
+      flash("Reconnecting…","setupErr");
+      clearTimeout(reconnectTimer);
+      reconnectTimer=setTimeout(()=>connect(()=>send({type:"join",name:myName||"Player",code:myCode,pid:myPid})), 1500);
+    } else {
+      flash("Lost connection to the lobby.","setupErr");
+    }
+  };
+  ws.onerror=()=>{};
 }
 function send(o){ws.send(JSON.stringify(o))}
 function val(id){return $(id).value.trim()}
 
-function create(){ myName=val("name")||"Host"; connect(()=>send({type:"create",name:myName})); }
-function join(){ myName=val("name")||"Player"; const c=val("code"); if(c.length<4)return flash("Enter the 4-letter code.","setupErr"); connect(()=>send({type:"join",name:myName,code:c})); }
+function create(){ myName=val("name")||"Host"; rememberName(); connect(()=>send({type:"create",name:myName,pid:myPid})); }
+function join(){ myName=val("name")||"Player"; rememberName(); const c=val("code"); if(c.length<4)return flash("Enter the 4-letter code.","setupErr"); myCode=c.toUpperCase(); connect(()=>send({type:"join",name:myName,code:myCode,pid:myPid})); }
 function start(){ send({type:"start"}); }
 function toggleReady(){ send({type:"ready"}); }
+function rememberName(){ try{ sessionStorage.setItem("ib_name", myName); }catch{} }
 
 function handle(m){
-  if(m.type==="joined"){ $("roomCode").textContent=m.code; $("dRoom").textContent=m.code; show("lobby"); return; }
-  if(m.type==="error"){ const where = state&&state.state==="drafting" ? "draftErr" : (!$("lobby").classList.contains("hide")?"lobbyErr":"setupErr"); flash(bigfootError(m.msg), where); return; }
+  if(m.type==="joined"){
+    if(m.pid){ myPid=m.pid; try{localStorage.setItem("ib_pid",myPid);}catch{} }
+    myCode=m.code;
+    try{ sessionStorage.setItem("ib_code", myCode); }catch{}
+    $("roomCode").textContent=m.code; $("dRoom").textContent=m.code; show("lobby"); return;
+  }
+  if(m.type==="error"){
+    // a failed reconnect (room gone) shouldn't trap us on a dead screen
+    if(state===null && myCode){ myCode=null; try{sessionStorage.removeItem("ib_code");}catch{} show("setup"); }
+    const where = state&&state.state==="drafting" ? "draftErr" : (!$("lobby").classList.contains("hide")?"lobbyErr":"setupErr"); flash(bigfootError(m.msg), where); return;
+  }
   if(m.type==="state"){ state=m; render(); }
 }
+
+// On page load, if we have a remembered room, try to rejoin our seat silently.
+window.addEventListener("load", ()=>{
+  if(myCode){ connect(()=>send({type:"join",name:myName||"Player",code:myCode,pid:myPid})); }
+});
 
 function bigfootError(msg){
   const map={ "not your turn":"not your turn yet. patience.", "already taken":"too slow — somebody grabbed him.",
